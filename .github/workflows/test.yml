@@ -6,25 +6,10 @@ on:
       - "dist/index.js"
 jobs:
   run:
-    runs-on: ${{ matrix.os }}
-    if: ${{ always() }}
-    strategy:
-      max-parallel: 3
-      matrix:
-        os:
-          - ubuntu-20.04
-          - ubuntu-22.04
-          - macos-11
-          - macos-12
-          - windows-2019
-          - windows-2022
-        version:
-          - 1.23.14
-          - 1.24.8
-          - 1.25.4
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
-        if: github.repository == 'matootie/dokube'
+      - uses: actions/checkout@v7
+        if: github.repository == 'emiledeloof/dokube'
       - uses: ./
         with:
           personalAccessToken: ${{ secrets.DIGITALOCEAN_TOKEN }}
