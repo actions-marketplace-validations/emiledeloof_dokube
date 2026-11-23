@@ -16,6 +16,7 @@
  *   MOCK_ACCESS_TOKEN=test-token   the personalAccessToken the action must send
  *   MOCK_CLUSTER_NAME=e2e-cluster  name of the cluster the action should find
  *   MOCK_CLUSTER_REGION=nyc1
+ *   MOCK_CLUSTER_VERSION=1.36.6-do.0  Kubernetes version the cluster reports
  *   MOCK_FILLER_CLUSTERS=250       extra clusters, to exercise pagination
  *   MOCK_K8S_SERVER=https://...    API server put into the credentials
  *   MOCK_K8S_CA_DATA=<base64>      CA bundle put into the credentials
@@ -38,6 +39,9 @@ import { pathToFileURL } from "node:url"
 /** ID of the cluster `makeClusters` puts last in the list. */
 export const TARGET_CLUSTER_ID = "11111111-2222-3333-4444-555555555555"
 
+/** Kubernetes version the mock's target cluster reports by default. */
+export const DEFAULT_CLUSTER_VERSION = "1.36.6-do.0"
+
 /**
  * Build a list of clusters: `fillerCount` decoys plus the target cluster last,
  * so finding it requires walking every page.
@@ -46,12 +50,18 @@ export function makeClusters(
   name = "e2e-cluster",
   region = "nyc1",
   fillerCount = 0,
+  version = DEFAULT_CLUSTER_VERSION,
 ) {
   const clusters = []
   for (let i = 0; i < fillerCount; i++) {
-    clusters.push({ id: `filler-${i}`, name: `filler-${i}`, region: "ams3" })
+    clusters.push({
+      id: `filler-${i}`,
+      name: `filler-${i}`,
+      region: "ams3",
+      version: "1.35.10-do.0",
+    })
   }
-  clusters.push({ id: TARGET_CLUSTER_ID, name, region })
+  clusters.push({ id: TARGET_CLUSTER_ID, name, region, version })
   return clusters
 }
 
@@ -162,6 +172,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
       env.MOCK_CLUSTER_NAME ?? "e2e-cluster",
       env.MOCK_CLUSTER_REGION ?? "nyc1",
       Number(env.MOCK_FILLER_CLUSTERS ?? 250),
+      env.MOCK_CLUSTER_VERSION ?? DEFAULT_CLUSTER_VERSION,
     ),
     credentials: {
       server: env.MOCK_K8S_SERVER ?? "https://127.0.0.1:6443",

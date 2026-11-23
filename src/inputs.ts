@@ -36,6 +36,6 @@ export function getInputs(): Inputs {
     clusterId,
     expirySeconds: Number(rawExpiry),
     namespace: core.getInput("namespace") || "default",
-    version: core.getInput("version") || "latest",
+    version: core.getInput("version") || "cluster",
   }
 }

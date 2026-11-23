@@ -19,9 +19,9 @@ inputs:
     required: false
     default: "default"
   version:
-    description: 'The kubectl version: "latest", a minor version like "1.31" (newest patch), or an exact version like "1.31.4".'
+    description: 'The kubectl version: "cluster" to match the cluster''s Kubernetes version, "latest", a minor version like "1.31" (newest patch), or an exact version like "1.31.4".'
     required: false
-    default: "latest"
+    default: "cluster"
 outputs:
   kubeconfig:
     description: "Path to the generated kubeconfig (also exported as KUBECONFIG)."

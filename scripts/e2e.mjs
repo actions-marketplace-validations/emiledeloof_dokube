@@ -13,7 +13,8 @@
  *                        kubeconfig the action wrote
  *
  * Flags: --kind, --keep (don't delete the kind cluster afterwards)
- * Env:   E2E_KUBECTL_VERSION (default "latest")
+ * Env:   E2E_KUBECTL_VERSION (the action's `version` input; unset = the
+ *        default, which matches the cluster's version)
  */
 
 import { execFileSync, spawn, spawnSync } from "node:child_process"
@@ -32,6 +33,7 @@ import { fileURLToPath } from "node:url"
 
 import {
   TARGET_CLUSTER_ID,
+  DEFAULT_CLUSTER_VERSION,
   makeClusters,
   startMockApi,
 } from "../test/mock-do-api.mjs"
@@ -153,8 +155,14 @@ function prepareKindCluster() {
     "10m",
   )
 
+  // Report the kind cluster's real version, like DigitalOcean would.
+  const serverVersion = JSON.parse(
+    kubectl("version", "-o", "json"),
+  ).serverVersion.gitVersion.replace(/^v/, "")
+
   return {
     created,
+    clusterVersion: `${serverVersion}-do.0`,
     credentials: {
       server: cluster.server,
       certificate_authority_data: cluster["certificate-authority-data"],
@@ -220,7 +228,12 @@ async function main() {
   const kind = useKind ? prepareKindCluster() : undefined
   const mock = await startMockApi({
     accessToken: ACCESS_TOKEN,
-    clusters: makeClusters(CLUSTER_NAME, "nyc1", 250),
+    clusters: makeClusters(
+      CLUSTER_NAME,
+      "nyc1",
+      250,
+      kind?.clusterVersion ?? DEFAULT_CLUSTER_VERSION,
+    ),
     credentials: kind?.credentials,
   })
   const workdir = mkdtempSync(path.join(os.tmpdir(), "dokube-e2e-"))
@@ -242,7 +255,9 @@ async function main() {
       clusterName: CLUSTER_NAME,
       expirationTime: "300",
       namespace: "default",
-      version: process.env.E2E_KUBECTL_VERSION ?? "latest",
+      ...(process.env.E2E_KUBECTL_VERSION
+        ? { version: process.env.E2E_KUBECTL_VERSION }
+        : {}),
     })
     if (status !== 0) fail(`Action exited with ${status}.`)
 
@@ -301,6 +316,15 @@ async function main() {
     console.log(`  kubectl client: ${clientVersion}`)
     if (clientVersion !== `v${outputs["kubectl-version"]}`)
       fail("Installed kubectl doesn't match kubectl-version output.")
+
+    const requested = process.env.E2E_KUBECTL_VERSION ?? "cluster"
+    if (requested === "cluster") {
+      const clusterVersion = kind?.clusterVersion ?? DEFAULT_CLUSTER_VERSION
+      const minor = (v) => v.split(".").slice(0, 2).join(".")
+      console.log(`  cluster version: ${clusterVersion}`)
+      if (minor(clientVersion.slice(1)) !== minor(clusterVersion))
+        fail("kubectl's minor version doesn't match the cluster's.")
+    }
 
     const context = kubectl("config", "current-context")
     console.log(`  current context: ${context}`)

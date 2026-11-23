@@ -21,7 +21,7 @@ describe("getInputs", () => {
       clusterId: "",
       expirySeconds: 600,
       namespace: "default",
-      version: "latest",
+      version: "cluster",
     })
   })
 

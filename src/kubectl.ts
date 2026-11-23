@@ -14,9 +14,49 @@ export const KUBECTL_RELEASE_URL = "https://dl.k8s.io/release"
 
 const FULL_VERSION = /^v?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$/
 const MINOR_VERSION = /^v?(\d+\.\d+)$/
+/** DigitalOcean cluster versions look like "1.33.1-do.0". */
+const CLUSTER_VERSION = /^v?((\d+\.\d+)\.\d+)/
 
 /**
- * Resolve a version input to an exact kubectl version (without the "v").
+ * Pick the kubectl version to install.
+ *
+ * With `input` "cluster" (the default) or empty, matches the cluster: the
+ * newest kubectl patch release of the cluster's minor version, which is always
+ * within the supported kubectl/server version skew. Anything else is resolved
+ * with `resolveKubectlVersion`.
+ */
+export async function chooseKubectlVersion(
+  input: string,
+  clusterVersion: string | undefined,
+): Promise<string> {
+  const value = input.trim()
+  if (value !== "" && value !== "cluster") return resolveKubectlVersion(value)
+
+  const match = CLUSTER_VERSION.exec(clusterVersion ?? "")
+  const exact = match?.[1]
+  const minor = match?.[2]
+  if (!exact || !minor) {
+    core.warning(
+      `Could not read the cluster's Kubernetes version ('${clusterVersion ?? ""}'); installing the latest kubectl instead.`,
+    )
+    return resolveKubectlVersion("latest")
+  }
+
+  core.info(
+    `Cluster runs Kubernetes ${exact}; installing the newest kubectl ${minor}.x.`,
+  )
+  try {
+    return await resolveKubectlVersion(minor)
+  } catch (error) {
+    core.warning(
+      `${error instanceof Error ? error.message : String(error)} Falling back to kubectl ${exact}.`,
+    )
+    return exact
+  }
+}
+
+/**
+ * Resolve an explicit version to an exact kubectl version (without the "v").
  *
  * Accepts "latest", a minor version like "1.31" (resolves to its newest patch),
  * or an exact version like "1.31.4" / "v1.31.4".
@@ -29,13 +69,13 @@ export async function resolveKubectlVersion(input: string): Promise<string> {
 
   let channel: string
   const minor = MINOR_VERSION.exec(value)?.[1]
-  if (value === "" || value === "latest" || value === "stable") {
+  if (value === "latest" || value === "stable") {
     channel = "stable"
   } else if (minor) {
     channel = `stable-${minor}`
   } else {
     throw new Error(
-      `Invalid kubectl version '${input}'. Use "latest", a minor version like "1.31", or an exact version like "1.31.4".`,
+      `Invalid kubectl version '${input}'. Use "cluster", "latest", a minor version like "1.31", or an exact version like "1.31.4".`,
     )
   }
 

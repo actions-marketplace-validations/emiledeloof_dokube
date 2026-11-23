@@ -34471,7 +34471,7 @@ function error(message, properties = {}) {
  * @param properties optional properties to add to the annotation.
  */
 function warning(message, properties = {}) {
-    issueCommand('warning', toCommandProperties(properties), message instanceof Error ? message.toString() : message);
+    command_issueCommand('warning', utils_toCommandProperties(properties), message instanceof Error ? message.toString() : message);
 }
 /**
  * Adds a notice issue
@@ -34706,7 +34706,7 @@ function getInputs() {
         clusterId,
         expirySeconds: Number(rawExpiry),
         namespace: getInput("namespace") || "default",
-        version: getInput("version") || "latest",
+        version: getInput("version") || "cluster",
     };
 }
 
@@ -35527,8 +35527,38 @@ function _unique(values) {
 const KUBECTL_RELEASE_URL = "https://dl.k8s.io/release";
 const FULL_VERSION = /^v?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$/;
 const MINOR_VERSION = /^v?(\d+\.\d+)$/;
+/** DigitalOcean cluster versions look like "1.33.1-do.0". */
+const CLUSTER_VERSION = /^v?((\d+\.\d+)\.\d+)/;
 /**
- * Resolve a version input to an exact kubectl version (without the "v").
+ * Pick the kubectl version to install.
+ *
+ * With `input` "cluster" (the default) or empty, matches the cluster: the
+ * newest kubectl patch release of the cluster's minor version, which is always
+ * within the supported kubectl/server version skew. Anything else is resolved
+ * with `resolveKubectlVersion`.
+ */
+async function chooseKubectlVersion(input, clusterVersion) {
+    const value = input.trim();
+    if (value !== "" && value !== "cluster")
+        return resolveKubectlVersion(value);
+    const match = CLUSTER_VERSION.exec(clusterVersion ?? "");
+    const exact = match?.[1];
+    const minor = match?.[2];
+    if (!exact || !minor) {
+        warning(`Could not read the cluster's Kubernetes version ('${clusterVersion ?? ""}'); installing the latest kubectl instead.`);
+        return resolveKubectlVersion("latest");
+    }
+    info(`Cluster runs Kubernetes ${exact}; installing the newest kubectl ${minor}.x.`);
+    try {
+        return await resolveKubectlVersion(minor);
+    }
+    catch (error) {
+        warning(`${error instanceof Error ? error.message : String(error)} Falling back to kubectl ${exact}.`);
+        return exact;
+    }
+}
+/**
+ * Resolve an explicit version to an exact kubectl version (without the "v").
  *
  * Accepts "latest", a minor version like "1.31" (resolves to its newest patch),
  * or an exact version like "1.31.4" / "v1.31.4".
@@ -35540,14 +35570,14 @@ async function resolveKubectlVersion(input) {
         return full;
     let channel;
     const minor = MINOR_VERSION.exec(value)?.[1];
-    if (value === "" || value === "latest" || value === "stable") {
+    if (value === "latest" || value === "stable") {
         channel = "stable";
     }
     else if (minor) {
         channel = `stable-${minor}`;
     }
     else {
-        throw new Error(`Invalid kubectl version '${input}'. Use "latest", a minor version like "1.31", or an exact version like "1.31.4".`);
+        throw new Error(`Invalid kubectl version '${input}'. Use "cluster", "latest", a minor version like "1.31", or an exact version like "1.31.4".`);
     }
     const response = await fetch(`${KUBECTL_RELEASE_URL}/${channel}.txt`);
     if (!response.ok) {
@@ -35684,7 +35714,7 @@ async function run() {
             return file;
         });
         const kubectlVersion = await group("Installing kubectl", async () => {
-            const version = await resolveKubectlVersion(inputs.version);
+            const version = await chooseKubectlVersion(inputs.version, cluster.version);
             info(`Using kubectl ${version}.`);
             addPath(await installKubectl(version));
             return version;

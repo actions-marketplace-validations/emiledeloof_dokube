@@ -58,6 +58,7 @@ describe("DigitalOceanClient", () => {
       id: TARGET_CLUSTER_ID,
       name: "e2e-cluster",
       region: "nyc1",
+      version: "1.36.6-do.0",
     })
     await expect(client.getCluster("nope")).rejects.toThrow(/404/)
   })

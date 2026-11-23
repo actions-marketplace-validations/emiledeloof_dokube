@@ -13,8 +13,8 @@ import { DigitalOceanClient } from "./digitalocean.js"
 import { getInputs } from "./inputs.js"
 import {
   buildKubeconfig,
+  chooseKubectlVersion,
   installKubectl,
-  resolveKubectlVersion,
 } from "./kubectl.js"
 
 export async function run(): Promise<void> {
@@ -57,7 +57,10 @@ export async function run(): Promise<void> {
     })
 
     const kubectlVersion = await core.group("Installing kubectl", async () => {
-      const version = await resolveKubectlVersion(inputs.version)
+      const version = await chooseKubectlVersion(
+        inputs.version,
+        cluster.version,
+      )
       core.info(`Using kubectl ${version}.`)
       core.addPath(await installKubectl(version))
       return version

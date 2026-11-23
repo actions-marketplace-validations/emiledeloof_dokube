@@ -13,6 +13,8 @@ export interface Cluster {
   id: string
   name: string
   region: string
+  /** Kubernetes version, e.g. "1.33.1-do.0". */
+  version?: string
 }
 
 export interface ClusterCredentials {

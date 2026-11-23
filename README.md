@@ -8,7 +8,7 @@ This is a maintained fork of [matootie/dokube](https://github.com/matootie/dokub
 
 v2 is a rewrite with a few breaking changes:
 
-- `version` now defaults to `latest` instead of an old pinned kubectl. Set it to your cluster's minor version (e.g. `"1.31"`) if you need to match it.
+- `version` now defaults to `cluster`: kubectl matches your cluster's Kubernetes version instead of an old pinned release.
 - kubectl is downloaded from `dl.k8s.io`, since the old download location no longer gets new releases.
 - The action runs on Node 24.
 - `clusterName` is optional if you pass the new `clusterId` input.
@@ -24,14 +24,14 @@ See the [releases](https://github.com/emiledeloof/dokube/releases) for the full 
 
 ## Inputs
 
-| Name                  | Requirement    | Description                                                                                                                                                                                                                                     |
-| :-------------------- | :------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `personalAccessToken` | **Required**   | A DigitalOcean [Personal Access Token](https://docs.digitalocean.com/reference/api/create-personal-access-token/) on the same account as the cluster. Needs the `kubernetes:read` and `kubernetes:access_cluster` scopes.                       |
-| `clusterName`         | **_Optional_** | The name of the cluster to operate on. Either `clusterName` or `clusterId` is required.                                                                                                                                                         |
-| `clusterId`           | **_Optional_** | The ID of the cluster. Skips looking the cluster up by name.                                                                                                                                                                                    |
-| `version`             | **_Optional_** | The kubectl version: `latest` (default), a minor version like `1.31` (installs its newest patch release), or an exact version like `1.31.4`. Pick one within one minor version of your cluster. _See [example](#specifying-a-kubectl-version)._ |
-| `expirationTime`      | **_Optional_** | How long, in seconds, the generated cluster credentials stay valid. Should be slightly longer than your job. Defaults to `600`. _See [example](#specifying-a-custom-expiration-time)._                                                          |
-| `namespace`           | **_Optional_** | The Kubernetes namespace to operate under. Defaults to `default`.                                                                                                                                                                               |
+| Name                  | Requirement    | Description                                                                                                                                                                                                                                                                                   |
+| :-------------------- | :------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `personalAccessToken` | **Required**   | A DigitalOcean [Personal Access Token](https://docs.digitalocean.com/reference/api/create-personal-access-token/) on the same account as the cluster. Needs the `kubernetes:read` and `kubernetes:access_cluster` scopes.                                                                     |
+| `clusterName`         | **_Optional_** | The name of the cluster to operate on. Either `clusterName` or `clusterId` is required.                                                                                                                                                                                                       |
+| `clusterId`           | **_Optional_** | The ID of the cluster. Skips looking the cluster up by name.                                                                                                                                                                                                                                  |
+| `version`             | **_Optional_** | The kubectl version: `cluster` (default) installs the newest kubectl release for your cluster's minor version. You can also use `latest`, a minor version like `1.36` (installs its newest patch release), or an exact version like `1.36.6`. _See [example](#specifying-a-kubectl-version)._ |
+| `expirationTime`      | **_Optional_** | How long, in seconds, the generated cluster credentials stay valid. Should be slightly longer than your job. Defaults to `600`. _See [example](#specifying-a-custom-expiration-time)._                                                                                                        |
+| `namespace`           | **_Optional_** | The Kubernetes namespace to operate under. Defaults to `default`.                                                                                                                                                                                                                             |
 
 ## Outputs
 
@@ -68,10 +68,10 @@ This sets up `kubectl` configured for your DigitalOcean Kubernetes cluster. Afte
   with:
     personalAccessToken: ${{ secrets.DIGITALOCEAN_TOKEN }}
     clusterName: my-fabulous-cluster
-    version: "1.31"
+    version: "1.36"
 ```
 
-kubectl supports clusters one minor version older or newer than itself, so match this to your cluster's version.
+By default the action reads your cluster's Kubernetes version and installs the matching kubectl, so you normally don't need this. kubectl only supports clusters within one minor version of itself, so if you do pin a version, keep it close to your cluster's.
 
 ### Specifying a custom expiration time
 

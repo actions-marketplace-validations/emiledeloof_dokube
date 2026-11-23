@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 
 import {
   buildKubeconfig,
+  chooseKubectlVersion,
   detectPlatform,
   kubectlDownloadUrl,
   resolveKubectlVersion,
@@ -43,16 +44,13 @@ describe("resolveKubectlVersion", () => {
     },
   )
 
-  it.each(["latest", "", "stable"])(
-    "resolves %j via stable.txt",
-    async (input) => {
-      const fetchMock = stubFetch("v1.37.2\n")
-      await expect(resolveKubectlVersion(input)).resolves.toBe("1.37.2")
-      expect(fetchMock).toHaveBeenCalledWith(
-        "https://dl.k8s.io/release/stable.txt",
-      )
-    },
-  )
+  it.each(["latest", "stable"])("resolves %j via stable.txt", async (input) => {
+    const fetchMock = stubFetch("v1.37.2\n")
+    await expect(resolveKubectlVersion(input)).resolves.toBe("1.37.2")
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://dl.k8s.io/release/stable.txt",
+    )
+  })
 
   it("resolves a minor version via its stable channel", async () => {
     const fetchMock = stubFetch("v1.31.9")
@@ -162,5 +160,66 @@ it("builds a doctl-style kubeconfig", () => {
     "current-context": "do-ams3-prod",
     preferences: {},
     users: [{ name: "do-ams3-prod-admin", user: { token: "secret" } }],
+  })
+})
+
+describe("chooseKubectlVersion", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  function stubChannels(channels: Record<string, string>) {
+    const fetchMock = vi.fn((url: string) => {
+      const body = channels[url.split("/").pop() ?? ""]
+      return Promise.resolve({
+        ok: body !== undefined,
+        status: body !== undefined ? 200 : 404,
+        url,
+        text: () => Promise.resolve(body ?? "Not found"),
+      })
+    })
+    vi.stubGlobal("fetch", fetchMock)
+    return fetchMock
+  }
+
+  it.each(["cluster", "", " cluster "])(
+    "matches the cluster's minor version for %j",
+    async (input) => {
+      const fetchMock = stubChannels({ "stable-1.33.txt": "v1.33.7" })
+      await expect(chooseKubectlVersion(input, "1.33.1-do.0")).resolves.toBe(
+        "1.33.7",
+      )
+      expect(fetchMock).toHaveBeenCalledWith(
+        "https://dl.k8s.io/release/stable-1.33.txt",
+      )
+    },
+  )
+
+  it("falls back to the cluster's exact version if its channel can't be read", async () => {
+    stubChannels({})
+    await expect(chooseKubectlVersion("cluster", "1.33.1-do.0")).resolves.toBe(
+      "1.33.1",
+    )
+  })
+
+  it.each([undefined, "", "weird"])(
+    "falls back to latest for an unreadable cluster version %j",
+    async (clusterVersion) => {
+      stubChannels({ "stable.txt": "v1.37.2" })
+      await expect(
+        chooseKubectlVersion("cluster", clusterVersion),
+      ).resolves.toBe("1.37.2")
+    },
+  )
+
+  it("uses an explicit version regardless of the cluster", async () => {
+    const fetchMock = stubChannels({ "stable.txt": "v1.37.2" })
+    await expect(chooseKubectlVersion("1.30.2", "1.33.1-do.0")).resolves.toBe(
+      "1.30.2",
+    )
+    await expect(chooseKubectlVersion("latest", "1.33.1-do.0")).resolves.toBe(
+      "1.37.2",
+    )
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })

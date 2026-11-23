@@ -1,0 +1,44 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "schedule": ["before 6am on monday"],
+  "prConcurrentLimit": 5,
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on the first day of the month"]
+  },
+  "packageRules": [
+    {
+      "description": "Group non-major dev dependency updates and merge them once CI passes. They don't end up in dist/.",
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "dev dependencies",
+      "automerge": true
+    },
+    {
+      "description": "Group GitHub Actions updates and merge them once CI passes.",
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions",
+      "automerge": true
+    },
+    {
+      "description": "Runtime dependencies are bundled into dist/, which Renovate can't rebuild. Never auto-merge them.",
+      "matchDepTypes": ["dependencies"],
+      "groupName": "runtime dependencies",
+      "automerge": false,
+      "prBodyNotes": [
+        "⚠️ **Runtime dependency:** check out this branch, run `npm ci && npm run build`, and commit the updated `dist/` before merging. CI fails until you do."
+      ]
+    },
+    {
+      "description": "Keep @types/node on the Node version the action runs on (node24 in action.yml).",
+      "matchPackageNames": ["@types/node"],
+      "allowedVersions": "<25"
+    },
+    {
+      "description": "TypeScript 7 is the native (Go) compiler; typescript-eslint and ncc's loader don't support it yet.",
+      "matchPackageNames": ["typescript"],
+      "allowedVersions": "<7"
+    }
+  ]
+}
