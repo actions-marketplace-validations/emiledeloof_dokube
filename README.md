@@ -2,9 +2,18 @@
 
 Fetches the config for your DigitalOcean Kubernetes Cluster, then installs and configures `kubectl`, exposing it to path for future use!
 
-**Disclaimer:** As of late, I haven't been using much Kubernetes in my daily projects. I've been focusing more on developing with serverless functions. Because of this, I haven't been making use of this GitHub Action either, so I haven't been able to find any bugs or feature ideas. Consider this project relatively unmaintained. That is to say, if you _do_ make use of it and would like to submit and Issue outlining a problem you're facing, or a feature you want to implement, I will definitely be around to address those. Thank you.
+This is a maintained fork of [matootie/dokube](https://github.com/matootie/dokube).
 
-For help updating, view the [change logs](https://github.com/matootie/dokube/releases).
+### Upgrading from v1
+
+v2 is a rewrite with a few breaking changes:
+
+- `version` now defaults to `latest` instead of an old pinned kubectl. Set it to your cluster's minor version (e.g. `"1.31"`) if you need to match it.
+- kubectl is downloaded from `dl.k8s.io`, since the old download location no longer gets new releases.
+- The action runs on Node 24.
+- `clusterName` is optional if you pass the new `clusterId` input.
+
+See the [releases](https://github.com/emiledeloof/dokube/releases) for the full changelog.
 
 ## Runs on
 
@@ -39,7 +48,7 @@ For help updating, view the [change logs](https://github.com/matootie/dokube/rel
 ```yaml
 # Set up the Kubernetes CLI with your DigitalOcean Kubernetes cluster.
 - name: Set up kubectl
-  uses: matootie/dokube@v1.4.1
+  uses: emiledeloof/dokube@v2
   with:
     personalAccessToken: ${{ secrets.DIGITALOCEAN_TOKEN }}
     clusterName: my-fabulous-cluster
@@ -55,7 +64,7 @@ This sets up `kubectl` configured for your DigitalOcean Kubernetes cluster. Afte
 
 ```yaml
 - name: Set up kubectl
-  uses: matootie/dokube@v1.4.1
+  uses: emiledeloof/dokube@v2
   with:
     personalAccessToken: ${{ secrets.DIGITALOCEAN_TOKEN }}
     clusterName: my-fabulous-cluster
@@ -68,7 +77,7 @@ kubectl supports clusters one minor version older or newer than itself, so match
 
 ```yaml
 - name: Set up kubectl
-  uses: matootie/dokube@v1.4.1
+  uses: emiledeloof/dokube@v2
   with:
     personalAccessToken: ${{ secrets.DIGITALOCEAN_TOKEN }}
     clusterName: my-fabulous-cluster
@@ -82,7 +91,7 @@ The generated credentials only last a short time, since they are only meant to b
 ```yaml
 - name: Set up kubectl
   id: dokube
-  uses: matootie/dokube@v1.4.1
+  uses: emiledeloof/dokube@v2
   with:
     personalAccessToken: ${{ secrets.DIGITALOCEAN_TOKEN }}
     clusterName: my-fabulous-cluster
@@ -137,5 +146,5 @@ The other `MOCK_*` settings are documented at the top of `test/mock-do-api.mjs`.
 ### CI
 
 - **CI** (`ci.yml`): lint, typecheck, unit tests, and a check that `dist/` matches `src/`.
-- **E2E** (`e2e.yml`): runs the action via `uses: ./` against the mock API on Linux, macOS and Windows, plus the kind test.
+- **E2E** (`e2e.yml`): runs the action via `uses: ./` against the mock API on Linux and macOS, runs `npm run e2e` on Windows, and runs the kind test.
 - **Integration** (`integration-digitalocean.yml`): runs against a real cluster when the `DIGITALOCEAN_TOKEN` and `CLUSTER_NAME` secrets are set; skipped otherwise. Run it manually from the Actions tab.
