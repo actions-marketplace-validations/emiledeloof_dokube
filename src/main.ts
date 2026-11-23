@@ -1,3 +1,3 @@
-import { run } from "@app"
+import { run } from "./action.js"
 
-run()
+await run()

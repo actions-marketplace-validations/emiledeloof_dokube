@@ -2,13 +2,16 @@ name: "DigitalOcean Kubernetes"
 description: "Use DigitalOcean Kubernetes in GitHub Actions"
 inputs:
   personalAccessToken:
-    description: "DigitalOcean Personal Access Token; Used to fetch latest Kubernetes Config."
+    description: "DigitalOcean Personal Access Token, used to fetch short-lived cluster credentials. Needs the kubernetes:read and kubernetes:access_cluster scopes."
     required: true
   clusterName:
-    description: "The name of the DigitalOcean Kubernetes cluster that you plan to work with."
-    required: true
+    description: "The name of the DigitalOcean Kubernetes cluster. Either this or clusterId is required."
+    required: false
+  clusterId:
+    description: "The ID of the DigitalOcean Kubernetes cluster. Skips looking the cluster up by name."
+    required: false
   expirationTime:
-    description: "How long the kubeconfig should stay valid for."
+    description: "How long, in seconds, the generated cluster credentials stay valid."
     required: false
     default: "600"
   namespace:
@@ -16,9 +19,16 @@ inputs:
     required: false
     default: "default"
   version:
-    description: "The kubectl version to use."
+    description: 'The kubectl version: "latest", a minor version like "1.31" (newest patch), or an exact version like "1.31.4".'
     required: false
-    default: "1.21.9"
+    default: "latest"
+outputs:
+  kubeconfig:
+    description: "Path to the generated kubeconfig (also exported as KUBECONFIG)."
+  cluster-id:
+    description: "The ID of the cluster."
+  kubectl-version:
+    description: "The exact kubectl version that was installed."
 runs:
   using: "node24"
   main: "dist/index.js"

@@ -1,0 +1,40 @@
+name: Integration (real DigitalOcean)
+
+# Runs against a real DigitalOcean cluster. Needs the DIGITALOCEAN_TOKEN and
+# CLUSTER_NAME repository secrets; skipped when they aren't set (e.g. on forks).
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: kubectl version
+        default: latest
+  push:
+    branches: [master]
+    paths:
+      - ".github/workflows/integration-digitalocean.yml"
+      - "dist/index.js"
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    env:
+      HAS_SECRETS: ${{ secrets.DIGITALOCEAN_TOKEN != '' && secrets.CLUSTER_NAME != '' }}
+    steps:
+      - name: Skip without secrets
+        if: env.HAS_SECRETS != 'true'
+        run: echo "::notice::DIGITALOCEAN_TOKEN / CLUSTER_NAME secrets not set; skipping."
+      - uses: actions/checkout@v7
+        if: env.HAS_SECRETS == 'true'
+      - uses: ./
+        if: env.HAS_SECRETS == 'true'
+        with:
+          personalAccessToken: ${{ secrets.DIGITALOCEAN_TOKEN }}
+          clusterName: ${{ secrets.CLUSTER_NAME }}
+          expirationTime: "300"
+          version: ${{ inputs.version || 'latest' }}
+      - if: env.HAS_SECRETS == 'true'
+        run: kubectl get nodes

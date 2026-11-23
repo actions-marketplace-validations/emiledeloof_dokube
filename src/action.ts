@@ -2,94 +2,71 @@
  * Main action runner.
  */
 
-// Standard imports.
-import { chmodSync, writeFileSync } from "fs"
+import { chmod, writeFile } from "node:fs/promises"
+import os from "node:os"
+import path from "node:path"
 
-// Actions imports.
 import * as core from "@actions/core"
 import * as io from "@actions/io"
-import * as tc from "@actions/tool-cache"
 
-// Utility imports.
-import { constructKubeconfig, kubectlSpec } from "@utils/kubectl"
-import { WORKDIR } from "@utils/constants"
-import { getClusterByName, getClusterCredentials } from "@utils/do"
+import { DigitalOceanClient } from "./digitalocean.js"
+import { getInputs } from "./inputs.js"
+import {
+  buildKubeconfig,
+  installKubectl,
+  resolveKubectlVersion,
+} from "./kubectl.js"
 
-/**
- * Main runner.
- */
-export async function run() {
+export async function run(): Promise<void> {
   try {
-    // Create the working directory.
-    console.log("Creating working directory...")
-    await io.mkdirP(WORKDIR)
+    const inputs = getInputs()
+    const client = new DigitalOceanClient(inputs.accessToken)
 
-    // Get user input.
-    console.log("Fetching user inputs...")
-    const accessToken = core.getInput("personalAccessToken")
-    const clusterName = core.getInput("clusterName")
-    const expirationTime = core.getInput("expirationTime")
-    const namespaceName = core.getInput("namespace")
-    const kubectlVersion = core.getInput("version")
+    const cluster = await core.group("Finding cluster", () =>
+      inputs.clusterId
+        ? client.getCluster(inputs.clusterId)
+        : client.findClusterByName(inputs.clusterName),
+    )
+    core.info(`Using cluster '${cluster.name}' (${cluster.id}).`)
 
-    // Get the cluster by name.
-    const cluster = await getClusterByName({
-      clusterName,
-      accessToken,
-    })
-    // Throw if no cluster could be found.
-    if (!cluster) {
-      throw new Error(`No cluster found with name '${clusterName}'.`)
-    }
+    const credentials = await core.group("Fetching cluster credentials", () =>
+      client.getCredentials(cluster.id, inputs.expirySeconds),
+    )
+    core.setSecret(credentials.token)
 
-    // Get cluster credentials.
-    const credentials = await getClusterCredentials({
-      cluster,
-      accessToken,
-      expirationTime,
-    })
-
-    // Construct a Kubernetes CLI config.
-    const kubeconfig = constructKubeconfig({
-      auth: credentials.certificate_authority_data,
-      server: credentials.server,
-      name: cluster.name,
-      region: cluster.region,
-      namespace: namespaceName,
-      token: credentials.token,
+    const kubeconfigPath = await core.group("Writing kubeconfig", async () => {
+      const dir = path.join(process.env.RUNNER_TEMP || os.tmpdir(), "dokube")
+      await io.mkdirP(dir)
+      const file = path.join(dir, "kubeconfig")
+      const kubeconfig = buildKubeconfig({
+        clusterName: cluster.name,
+        region: cluster.region,
+        server: credentials.server,
+        certificateAuthorityData: credentials.certificate_authority_data,
+        token: credentials.token,
+        namespace: inputs.namespace,
+      })
+      await writeFile(file, JSON.stringify(kubeconfig, null, 2), {
+        mode: 0o600,
+      })
+      // `mode` only applies when the file is created; enforce it on reruns too.
+      await chmod(file, 0o600)
+      core.exportVariable("KUBECONFIG", file)
+      core.info(`Wrote ${file} and set it as KUBECONFIG.`)
+      return file
     })
 
-    // Save the Kubernetes CLI config.
-    console.log("Writing Kubernetes CLI config to disk...")
-    writeFileSync(`${WORKDIR}/kubeconfig`, JSON.stringify(kubeconfig, null, 2))
+    const kubectlVersion = await core.group("Installing kubectl", async () => {
+      const version = await resolveKubectlVersion(inputs.version)
+      core.info(`Using kubectl ${version}.`)
+      core.addPath(await installKubectl(version))
+      return version
+    })
 
-    // Set KUBECONFIG environment variable.
-    console.log("Setting Kubernetes CLI config as default...")
-    core.exportVariable("KUBECONFIG", `${WORKDIR}/kubeconfig`)
-
-    // Download and install Kubernetes CLI.
-    const spec = kubectlSpec(kubectlVersion)
-    let kubectlDirectory = tc.find("kubectl", kubectlVersion, spec.architecture)
-    if (!kubectlDirectory) {
-      console.log("Downloading Kubernetes CLI...")
-      const kubectl = await tc.downloadTool(spec.url)
-      chmodSync(kubectl, 0o777)
-      kubectlDirectory = await tc.cacheFile(
-        kubectl,
-        spec.executable,
-        "kubectl",
-        kubectlVersion,
-        spec.architecture,
-      )
-    }
-
-    // Add Kubernetes CLI to PATH.
-    console.log("Adding Kubernetes CLI to path...")
-    core.addPath(kubectlDirectory)
-
-    // Done!
-    console.log("Done!")
-  } catch (error: any) {
-    core.setFailed(error)
+    core.setOutput("kubeconfig", kubeconfigPath)
+    core.setOutput("cluster-id", cluster.id)
+    core.setOutput("kubectl-version", kubectlVersion)
+  } catch (error) {
+    core.setFailed(error instanceof Error ? error.message : String(error))
   }
 }
