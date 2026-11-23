@@ -10,7 +10,7 @@ on:
         description: kubectl version
         default: latest
   push:
-    branches: [master]
+    branches: [main]
     paths:
       - ".github/workflows/integration-digitalocean.yml"
       - "dist/index.js"
