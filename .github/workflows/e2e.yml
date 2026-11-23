@@ -12,13 +12,13 @@ permissions:
   contents: read
 
 jobs:
-  # Runs the action through `uses: ./` on every runner OS, so action.yml,
-  # outputs and the kubectl download are exercised for real.
+  # Runs the action through `uses: ./`, so action.yml, outputs and the kubectl
+  # download are exercised for real.
   mock-api:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest]
         version: ["latest", "1.33"]
     runs-on: ${{ matrix.os }}
     steps:
@@ -32,12 +32,7 @@ jobs:
       - run: npm run build
 
       - name: Start mock DigitalOcean API
-        if: runner.os != 'Windows'
         run: nohup node test/mock-do-api.mjs > mock-api.log 2>&1 &
-      - name: Start mock DigitalOcean API (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: Start-Process node -ArgumentList "test/mock-do-api.mjs" -RedirectStandardOutput mock-api.log -NoNewWindow
       - name: Wait for mock API
         shell: bash
         run: |
@@ -73,6 +68,26 @@ jobs:
           echo "kubectl client: $client"
           test "$client" = "v$KUBECTL_VERSION"
           if [ "${{ matrix.version }}" = "1.33" ]; then [[ "$KUBECTL_VERSION" == 1.33.* ]]; fi
+
+  # Windows kills background processes when a step ends, so the mock can't live
+  # in its own step. scripts/e2e.mjs hosts the mock in-process and runs
+  # dist/index.js the way the runner does.
+  windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ["latest", "1.33"]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run e2e
+        env:
+          E2E_KUBECTL_VERSION: ${{ matrix.version }}
 
   # Points the mock API at a real kind cluster and runs `kubectl get nodes`.
   kind:

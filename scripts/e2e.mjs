@@ -25,6 +25,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs"
+import { randomUUID } from "node:crypto"
 import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -192,6 +193,12 @@ async function runAction(mockUrl, workdir, inputs) {
       KUBECONFIG: "",
     },
   })
+  // On GitHub Actions, stop the runner from acting on the child's workflow
+  // commands (e.g. turning the expected "No cluster found" into an annotation).
+  const stopToken = randomUUID()
+  const inActions = process.env.GITHUB_ACTIONS === "true"
+  if (inActions) console.log(`::stop-commands::${stopToken}`)
+
   let stdout = ""
   child.stdout.setEncoding("utf8").on("data", (chunk) => {
     stdout += chunk
@@ -202,6 +209,7 @@ async function runAction(mockUrl, workdir, inputs) {
     child.on("error", reject)
     child.on("close", resolve)
   })
+  if (inActions) console.log(`::${stopToken}::`)
   return { status, stdout, files }
 }
 
