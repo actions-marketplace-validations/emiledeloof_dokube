@@ -16,10 +16,20 @@
       "automerge": true
     },
     {
-      "description": "Group GitHub Actions updates and merge them once CI passes.",
+      "description": "Group GitHub Actions updates. Only non-major ones merge automatically once CI passes.",
       "matchManagers": ["github-actions"],
       "groupName": "GitHub Actions",
       "automerge": true
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["major"],
+      "automerge": false
+    },
+    {
+      "description": "CI must test on the Node version the action runs on (runs.using in action.yml). Bump both together by hand when GitHub supports a newer runtime.",
+      "matchDepNames": ["node"],
+      "allowedVersions": "<25"
     },
     {
       "description": "Runtime dependencies are bundled into dist/, which Renovate can't rebuild. Never auto-merge them.",
