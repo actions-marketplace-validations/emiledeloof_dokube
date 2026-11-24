@@ -1,4 +1,4 @@
-name: "DigitalOcean Kubernetes"
+name: "DigitalOcean Kubernetes Rewrite"
 description: "Use DigitalOcean Kubernetes in GitHub Actions"
 inputs:
   personalAccessToken:
