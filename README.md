@@ -12,6 +12,7 @@ v2 is a rewrite with a few breaking changes:
 - kubectl is downloaded from `dl.k8s.io`, since the old download location no longer gets new releases.
 - The action runs on Node 24.
 - `clusterName` is optional if you pass the new `clusterId` input.
+- The kubeconfig is now written to `$RUNNER_TEMP/dokube/kubeconfig` instead of `$HOME/dokubetemp/kubeconfig`. If you hard-coded the old path, use `$KUBECONFIG` or the `kubeconfig` output instead.
 
 See the [releases](https://github.com/emiledeloof/dokube/releases) for the full changelog.
 
